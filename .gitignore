@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.svelte-kit/
+.wrangler/
+.dev.vars
+coverage/
+.DS_Store
+.scratch/
+.claude/

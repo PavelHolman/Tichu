@@ -1,0 +1,52 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "import"],
+  "jsPlugins": [{ "name": "eslint-js", "specifier": "oxlint-plugin-eslint" }],
+  "categories": { "correctness": "error", "suspicious": "warn" },
+  "ignorePatterns": [
+    "**/.svelte-kit/**",
+    "**/build/**",
+    "**/.wrangler/**",
+    "**/worker-configuration.d.ts"
+  ],
+  "rules": {
+    "no-underscore-dangle": "off",
+    "no-restricted-globals": [
+      "error",
+      {
+        "globals": [
+          {
+            "name": "Date",
+            "message": "Use Temporal (Temporal.Now, Temporal.Instant). Date is banned outside the time bridge."
+          }
+        ],
+        "checkGlobalObject": true
+      }
+    ],
+    "typescript/no-restricted-types": [
+      "error",
+      {
+        "types": {
+          "Date": { "message": "Use Temporal.Instant or Temporal.ZonedDateTime instead of Date." }
+        }
+      }
+    ],
+    "eslint-js/no-restricted-syntax": [
+      "error",
+      {
+        "selector": "ThrowStatement",
+        "message": "`throw` is forbidden: fail through Effect (Effect.fail, Effect.die)."
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["**/time/bridge.ts"],
+      "rules": { "no-restricted-globals": "off", "typescript/no-restricted-types": "off" }
+    },
+    {
+      "files": ["apps/table/src/index.ts"],
+      "rules": { "eslint-js/no-restricted-syntax": "off" }
+    }
+  ]
+}
