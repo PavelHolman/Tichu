@@ -1,4 +1,4 @@
-import type { StandardEvent } from "@tichu/engine";
+import type { GameEvent } from "@tichu/engine";
 import {
   CreateTableRequest,
   JoinRequest,
@@ -106,7 +106,7 @@ export class Table extends DurableObject<Env> {
         seq: row.seq,
         match: row.match,
         at: row.at,
-        event: JSON.parse(row.event) as StandardEvent,
+        event: JSON.parse(row.event) as GameEvent,
       }));
   }
 

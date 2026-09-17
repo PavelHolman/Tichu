@@ -1,6 +1,6 @@
 import { assert, describe, expect, it } from "@effect/vitest";
-import { pendingDecisions } from "@tichu/engine";
-import { defaultTableSettings, type ClientMessage } from "@tichu/protocol";
+import { game } from "@tichu/engine";
+import { defaultTableSettings, type ClientMessage, type TableSettings } from "@tichu/protocol";
 import { Effect } from "effect";
 import {
   BOT_DELAY_MILLIS,
@@ -32,14 +32,16 @@ const rejectedBy = (effect: Effect.Effect<Transition, { reason: string }>) =>
   Effect.flip(effect).pipe(Effect.map((error) => error.reason));
 
 /** A Table with Anna in Seat 0 and Bots elsewhere, started at time 0. */
-const botTable = Effect.gen(function* () {
-  let state = yield* joined(newTable("abcdefghij", defaultTableSettings, 0), "Anna", 0);
-  state = (yield* connect(state, 0, 0)).state;
-  for (const seat of [1, 2, 3]) {
-    state = (yield* send(state, 0, { _tag: "FillSeat", seat, tier: "heuristic" })).state;
-  }
-  return yield* send(state, 0, { _tag: "Start" });
-});
+const botTableWith = (settings: TableSettings) =>
+  Effect.gen(function* () {
+    let state = yield* joined(newTable("abcdefghij", settings, 0), "Anna", 0);
+    state = (yield* connect(state, 0, 0)).state;
+    for (const seat of [1, 2, 3]) {
+      state = (yield* send(state, 0, { _tag: "FillSeat", seat, tier: "heuristic" })).state;
+    }
+    return yield* send(state, 0, { _tag: "Start" });
+  });
+const botTable = botTableWith(defaultTableSettings);
 
 describe("lobby", () => {
   it.effect("makes the first Player the creator and de-duplicates nicknames", () =>
@@ -86,7 +88,7 @@ describe("play", () => {
   it.effect("accepts an answer only for the pending Decision's id", () =>
     Effect.gen(function* () {
       const { state } = yield* botTable;
-      const mine = pendingDecisions(state.game!).find((decision) => decision.seat === 0);
+      const mine = game.pendingDecisions(state.game!).find((decision) => decision.seat === 0);
       assert(mine?._tag === "GrandTichu");
       const command = { _tag: "GrandTichu", seat: 0, call: false } as const;
       expect(
@@ -117,7 +119,7 @@ describe("play", () => {
         "GrandTichuDecided",
         "GrandTichuDecided",
       ]);
-      expect(pendingDecisions(due.state.game!).map((decision) => decision.seat)).toEqual([0]);
+      expect(game.pendingDecisions(due.state.game!).map((decision) => decision.seat)).toEqual([0]);
       expect(due.state.record.botsDueAt).toBeNull();
     }),
   );
@@ -150,15 +152,11 @@ describe("play", () => {
     "plays a whole Bot Match through alarms, exports it and offers a rematch",
     () =>
       Effect.gen(function* () {
-        let { state } = yield* botTable;
+        let { state } = yield* botTableWith({
+          ...defaultTableSettings,
+          game: { _tag: "Standard", match: { targetScore: 200 } },
+        });
         state = (yield* disconnect(state, 0, 0)).state;
-        state = {
-          ...state,
-          record: {
-            ...state.record,
-            settings: { ...state.record.settings, match: { targetScore: 200 } },
-          },
-        };
         const exports: Array<number> = [];
         let now = 0;
         for (let wake = 0; wake < 20_000 && state.record.status === "playing"; wake++) {
@@ -172,7 +170,7 @@ describe("play", () => {
         state = (yield* connect(state, 0, now)).state;
         const rematch = yield* send(state, 0, { _tag: "Rematch" }, now);
         expect(rematch.state.record.match).toBe(2);
-        expect(rematch.state.game?.winningTeam).toBeNull();
+        expect(rematch.state.game !== null && game.isOver(rematch.state.game)).toBe(false);
       }),
     60_000,
   );
@@ -214,5 +212,48 @@ describe("Seats", () => {
       expect(closed.exports).toEqual([1]);
       expect(closed.closeSockets).toBe(true);
     }),
+  );
+});
+
+const seigneurSettings = (seats: number): TableSettings => ({
+  ...defaultTableSettings,
+  game: { _tag: "GrandSeigneur", match: { seats, decks: 1 } },
+});
+
+describe("Grand Seigneur Tables", () => {
+  it.effect(
+    "resizes the lobby to the Variant's Seats and plays hierarchy Rounds with Bots",
+    () =>
+      Effect.gen(function* () {
+        let state = yield* joined(newTable("abcdefghij", defaultTableSettings, 0), "Anna", 0);
+        state = (yield* connect(state, 0, 0)).state;
+        state = (yield* send(state, 0, { _tag: "UpdateSettings", settings: seigneurSettings(6) }))
+          .state;
+        expect(state.record.seats).toHaveLength(6);
+        for (const seat of [1, 2, 3, 4, 5]) {
+          const tier = seat % 2 === 0 ? "random" : "heuristic";
+          state = (yield* send(state, 0, { _tag: "FillSeat", seat, tier })).state;
+        }
+        expect(
+          yield* rejectedBy(
+            send(state, 0, { _tag: "UpdateSettings", settings: seigneurSettings(5) }),
+          ),
+        ).toBe("InvalidSeat");
+        state = (yield* send(state, 0, { _tag: "Start" })).state;
+        state = (yield* disconnect(state, 0, 0)).state;
+        let now = 0;
+        let rounds = 0;
+        for (let wake = 0; wake < 5_000 && rounds < 2; wake++) {
+          now = Math.max(now, nextAlarm(state) ?? now);
+          const result = yield* runDue(state, now);
+          rounds += result.events.filter(
+            (step) => step.logged.event._tag === "HierarchySet",
+          ).length;
+          state = result.state;
+        }
+        expect(rounds).toBe(2);
+        expect(state.record.status).toBe("playing");
+      }),
+    60_000,
   );
 });

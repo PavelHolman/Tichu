@@ -5,18 +5,13 @@
  */
 import { bots, heuristicBot, randomBot, type BotTier } from "@tichu/bots";
 import {
-  decide,
-  emptyStandardState,
-  evolve,
-  observe,
-  pendingDecisions,
-  redact,
-  start,
+  game as engine,
+  seatsFor,
   type Decision,
+  type GameCommand,
+  type GameEvent,
+  type GameState,
   type Seat,
-  type StandardCommand,
-  type StandardEvent,
-  type StandardState,
 } from "@tichu/engine";
 import type {
   ClientMessage,
@@ -90,20 +85,20 @@ export interface LoggedEvent {
   readonly seq: number;
   readonly match: number;
   readonly at: number;
-  readonly event: StandardEvent;
+  readonly event: GameEvent;
 }
 
 export interface TableState {
   readonly record: TableRecord;
   /** The engine state of the current Match, folded from its events. */
-  readonly game: StandardState | null;
+  readonly game: GameState | null;
 }
 
 /** What a transition asks the adapter to do. */
 export interface Transition {
   readonly state: TableState;
   /** Engine events to append and broadcast, each with the Match state right after it. */
-  readonly events: ReadonlyArray<{ readonly logged: LoggedEvent; readonly game: StandardState }>;
+  readonly events: ReadonlyArray<{ readonly logged: LoggedEvent; readonly game: GameState }>;
   /** Whether a Table-only change must be broadcast after the events. */
   readonly tableChanged: boolean;
   /** Matches whose event log is complete and should be exported. */
@@ -111,15 +106,13 @@ export interface Transition {
   readonly closeSockets: boolean;
 }
 
-const SEATS = 4;
-
 export const newTable = (id: string, settings: TableSettings, now: number): TableState => ({
   record: {
     id,
     settings,
     status: "lobby",
-    seats: Array.from({ length: SEATS }, () => null),
-    vacatedAt: Array.from({ length: SEATS }, () => null),
+    seats: Array.from({ length: seatsFor(settings.game) }, () => null),
+    vacatedAt: Array.from({ length: seatsFor(settings.game) }, () => null),
     creator: null,
     match: 0,
     seq: 0,
@@ -131,16 +124,16 @@ export const newTable = (id: string, settings: TableSettings, now: number): Tabl
 });
 
 /** Rebuilds live state from the persisted row and the current Match's events. */
-export const restore = (record: TableRecord, events: ReadonlyArray<StandardEvent>): TableState => ({
+export const restore = (record: TableRecord, events: ReadonlyArray<GameEvent>): TableState => ({
   record,
-  game: record.match === 0 ? null : events.reduce(evolve, emptyStandardState),
+  game: record.match === 0 || events.length === 0 ? null : engine.replay(events),
 });
 
 const replaceAt = <A>(items: ReadonlyArray<A>, index: number, value: A): Array<A> =>
   items.map((item, i) => (i === index ? value : item));
 
 class Builder {
-  events: Array<{ logged: LoggedEvent; game: StandardState }> = [];
+  events: Array<{ logged: LoggedEvent; game: GameState }> = [];
   tableChanged = false;
   exports: Array<number> = [];
   closeSockets = false;
@@ -152,12 +145,12 @@ class Builder {
     this.state = { ...this.state, record };
     if (changed) this.tableChanged = true;
   }
-  append(events: ReadonlyArray<StandardEvent>, now: number) {
+  append(events: ReadonlyArray<GameEvent>, now: number) {
     let { game, record } = this.state;
     let seq = record.seq;
     for (const event of events) {
       seq++;
-      game = evolve(game ?? emptyStandardState, event);
+      game = engine.evolve(game, event);
       this.events.push({ logged: { seq, match: record.match, at: now, event }, game });
       if (event._tag === "MatchEnded") {
         record = { ...record, status: "finished" };
@@ -328,21 +321,21 @@ const successor = (record: TableRecord, excluding: Seat): Seat | null => {
   return candidates[0]?.index ?? null;
 };
 
-const applyCommand = (out: Builder, command: StandardCommand, now: number) =>
+const applyCommand = (out: Builder, command: GameCommand, now: number) =>
   Effect.gen(function* () {
     const game = out.state.game;
     if (game === null || out.record.status !== "playing") {
       return yield* reject("WrongStatus", "No Match is in progress");
     }
-    const events = yield* decide(game, command).pipe(
-      Effect.mapError((violation) => reject("RuleViolation", violation.message)),
-    );
+    const events = yield* engine
+      .decide(game, command)
+      .pipe(Effect.mapError((violation) => reject("RuleViolation", violation.message)));
     out.append(events, now);
   });
 
 const startMatch = (out: Builder, now: number) =>
   Effect.gen(function* () {
-    const events = yield* start(out.record.settings.match);
+    const events = yield* engine.start(out.record.settings.game);
     out.setRecord({ ...out.record, status: "playing", match: out.record.match + 1 });
     out.state = { ...out.state, game: null };
     out.append(events, now);
@@ -355,7 +348,7 @@ export const receive = (state: TableState, seat: Seat, message: ClientMessage, n
     out.setRecord({ ...record, lastActivityAt: now }, false);
     switch (message._tag) {
       case "Answer": {
-        const pending = state.game === null ? [] : pendingDecisions(state.game);
+        const pending = state.game === null ? [] : engine.pendingDecisions(state.game);
         const decision = pending.find((candidate) => candidate.seat === seat);
         if (decision === undefined || decision.id !== message.decisionId) {
           return yield* reject("StaleDecision", "That Decision is no longer pending");
@@ -422,7 +415,21 @@ export const receive = (state: TableState, seat: Seat, message: ClientMessage, n
       case "UpdateSettings": {
         yield* requireCreator(record, seat);
         yield* requireStatus(record, "lobby");
-        out.setRecord({ ...out.record, settings: message.settings });
+        const seats = seatsFor(message.settings.game);
+        if (
+          record.seats.slice(seats).some((held) => held !== null) ||
+          (record.creator ?? 0) >= seats
+        ) {
+          return yield* reject("InvalidSeat", "Empty the Seats that would be removed first");
+        }
+        const resize = <A>(items: ReadonlyArray<A>, fill: A) =>
+          Array.from({ length: seats }, (_, index) => items[index] ?? fill);
+        out.setRecord({
+          ...out.record,
+          settings: message.settings,
+          seats: resize<SeatRecord>(record.seats, null),
+          vacatedAt: resize<number | null>(record.vacatedAt, null),
+        });
         break;
       }
       case "Start":
@@ -449,7 +456,7 @@ export const receive = (state: TableState, seat: Seat, message: ClientMessage, n
   });
 
 /** Whether a command answers `decision` (rather than being some other command from that Seat). */
-const answers = (decision: Decision, command: StandardCommand): boolean => {
+const answers = (decision: Decision, command: GameCommand): boolean => {
   switch (decision._tag) {
     case "GrandTichu":
       return command._tag === "GrandTichu";
@@ -459,6 +466,10 @@ const answers = (decision: Decision, command: StandardCommand): boolean => {
       return command._tag === "Play" || command._tag === "Pass";
     case "DragonGift":
       return command._tag === "GiftDragon";
+    case "ForcedGive":
+      return command._tag === "GiveBest";
+    case "ReturnCards":
+      return command._tag === "ReturnCards";
   }
 };
 
@@ -486,12 +497,12 @@ const botFor = (record: TableRecord, seat: Seat) => {
  */
 const botAnswer = (state: TableState, seat: Seat, decision: Decision) =>
   Effect.gen(function* () {
-    const game = state.game as StandardState;
+    const game = state.game as GameState;
     const seed = `${state.record.id}:${state.record.seq}:${seat}`;
-    const observation = observe(game, seat);
+    const observation = engine.observe(game, seat);
     const bot = botFor(state.record, seat);
     const chosen = yield* bot.decide(observation, decision).pipe(
-      Effect.flatMap((command) => decide(game, command).pipe(Effect.as(command))),
+      Effect.flatMap((command) => engine.decide(game, command).pipe(Effect.as(command))),
       Effect.catchCause((cause) =>
         Effect.logWarning(`Bot answer rejected, answering randomly: ${Cause.pretty(cause)}`).pipe(
           Effect.andThen(randomBot.decide(observation, decision)),
@@ -514,10 +525,10 @@ const botReactions = (out: Builder, now: number) =>
         if (held?._tag !== "Bot") continue;
         const seed = `${out.record.id}:${out.record.seq}:${seat}:react`;
         const command = yield* bots[held.tier]
-          .react(observe(game, seat))
+          .react(engine.observe(game, seat))
           .pipe(Random.withSeed(seed));
         if (command === undefined) continue;
-        const events = yield* Effect.result(decide(game, command));
+        const events = yield* Effect.result(engine.decide(game, command));
         if (events._tag === "Success") {
           out.append(events.success, now);
           reacted = true;
@@ -546,7 +557,8 @@ export const runDue = (state: TableState, now: number) =>
     const botsDue = state.record.botsDueAt !== null && state.record.botsDueAt <= now;
     if (game !== null && state.record.status === "playing") {
       const due = new Set(
-        pendingDecisions(game)
+        engine
+          .pendingDecisions(game)
           .filter((decision) => {
             if (state.record.seats[decision.seat]?._tag === "Bot") return botsDue;
             const takeover = takeoverDueAt(state.record, decision.seat);
@@ -559,11 +571,11 @@ export const runDue = (state: TableState, now: number) =>
       for (let guard = 0; guard < 16 && due.size > 0; guard++) {
         const current = out.state.game;
         if (current === null || out.record.status !== "playing") break;
-        const decision = pendingDecisions(current).find((pending) => due.has(pending.id));
+        const decision = engine.pendingDecisions(current).find((pending) => due.has(pending.id));
         if (decision === undefined) break;
         due.delete(decision.id);
         const command = yield* botAnswer(out.state, decision.seat, decision);
-        out.append(yield* decide(current, command).pipe(Effect.orDie), now);
+        out.append(yield* engine.decide(current, command).pipe(Effect.orDie), now);
       }
     }
     if (botsDue) out.setRecord({ ...out.record, botsDueAt: null }, false);
@@ -576,7 +588,7 @@ const scheduleBots = (out: Builder, now: number) =>
     const botPending =
       game !== null &&
       out.record.status === "playing" &&
-      pendingDecisions(game).some((decision) => drivenByBot(out.record, decision.seat, now));
+      engine.pendingDecisions(game).some((decision) => drivenByBot(out.record, decision.seat, now));
     if (!botPending) {
       if (out.record.botsDueAt !== null) out.setRecord({ ...out.record, botsDueAt: null }, false);
     } else if (out.record.botsDueAt === null) {
@@ -599,7 +611,7 @@ export const nextAlarm = (state: TableState): number | null => {
   const times: Array<number> = [record.lastActivityAt + RETENTION_MILLIS];
   if (record.botsDueAt !== null) times.push(record.botsDueAt);
   if (game !== null && record.status === "playing") {
-    for (const decision of pendingDecisions(game)) {
+    for (const decision of engine.pendingDecisions(game)) {
       const takeover = takeoverDueAt(record, decision.seat);
       // A takeover due before the Bots' next turn is answered together with them.
       const covered =
@@ -617,13 +629,13 @@ export const updateFor = (
   record: TableRecord,
   seat: Seat,
   event: LoggedEvent | null,
-  game: StandardState | null,
+  game: GameState | null,
 ): ServerMessage => ({
   _tag: "Update",
   seq: event?.seq ?? record.seq,
-  event: event === null ? null : redact(event.event, seat),
+  event: event === null ? null : engine.redact(event.event, seat),
   table: tableView(record),
-  observation: game === null ? null : observe(game, seat),
+  observation: game === null ? null : engine.observe(game, seat),
 });
 
 export const snapshotFor = (state: TableState, seat: Seat): ServerMessage => ({
@@ -631,7 +643,7 @@ export const snapshotFor = (state: TableState, seat: Seat): ServerMessage => ({
   seq: state.record.seq,
   table: tableView(state.record),
   you: seat,
-  observation: state.game === null ? null : observe(state.game, seat),
+  observation: state.game === null ? null : engine.observe(state.game, seat),
 });
 
 export const rejectionMessage = (rejection: TableRejection): ServerMessage => ({
