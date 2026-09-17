@@ -1,0 +1,11 @@
+{
+  "name": "Tichu",
+  "short_name": "Tichu",
+  "description": "Play Tichu with friends, with Bots in the empty Seats.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#14332a",
+  "theme_color": "#14332a",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

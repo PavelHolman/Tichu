@@ -11,6 +11,7 @@
   ],
   "rules": {
     "no-underscore-dangle": "off",
+    "import/no-unassigned-import": ["warn", { "allow": ["**/*.css", "temporal-polyfill/global"] }],
     "no-restricted-globals": [
       "error",
       {
@@ -40,6 +41,10 @@
     ]
   },
   "overrides": [
+    {
+      "files": ["**/*.d.ts"],
+      "rules": { "unicorn/require-module-specifiers": "off" }
+    },
     {
       "files": ["**/time/bridge.ts"],
       "rules": { "no-restricted-globals": "off", "typescript/no-restricted-types": "off" }
