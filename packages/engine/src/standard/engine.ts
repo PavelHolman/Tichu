@@ -8,6 +8,7 @@ import {
   sumPoints,
   type Card,
 } from "../kernel/cards.ts";
+import type { Reactions } from "../kernel/choices.ts";
 import { standardKernelOptions } from "../kernel/combination.ts";
 import { violation, type RuleViolation } from "../kernel/errors.ts";
 import {
@@ -38,10 +39,9 @@ import {
   defaultStandardSettings,
   type CallKind,
   type CallResult,
-  type Decision,
+  type StandardDecision,
   type Give,
-  type Observation,
-  type Reactions,
+  type StandardObservation,
   type RoundEnded,
   type StandardCommand,
   type StandardEvent,
@@ -54,6 +54,7 @@ const replaceAt = <A>(items: ReadonlyArray<A>, index: number, value: A): Array<A
   items.map((item, i) => (i === index ? value : item));
 
 export const emptyStandardState: StandardState = {
+  variant: "standard",
   layout: fourSeatsTwoTeams,
   settings: defaultStandardSettings,
   totals: [0, 0],
@@ -409,7 +410,7 @@ export const decide = (
   });
 
 /** Every Decision the engine is waiting on, across all Seats. */
-export const pendingDecisions = (state: StandardState): ReadonlyArray<Decision> => {
+export const pendingDecisions = (state: StandardState): ReadonlyArray<StandardDecision> => {
   const round = state.round;
   if (round === null || state.winningTeam !== null) return [];
   const { number, kernel } = round;
@@ -472,7 +473,7 @@ export const reactions = (state: StandardState, seat: Seat): Reactions => {
 };
 
 /** Everything a Participant in `seat` may see. */
-export const observe = (state: StandardState, seat: Seat): Observation => {
+export const observe = (state: StandardState, seat: Seat): StandardObservation => {
   const round = state.round;
   const decision = pendingDecisions(state).find((pending) => pending.seat === seat) ?? null;
   const base = {

@@ -68,6 +68,12 @@ describe("classify", () => {
     expect(lead("7j 7j'1 7s 7p")?.type).toBe("bomb");
   });
 
+  it("rejects a Phoenix single on another Phoenix", () => {
+    expect(
+      classify({ cards: cards("Ph'1") }, { type: "single", rank: 8.5, length: 1 }),
+    ).toBeUndefined();
+  });
+
   it("rejects a Phoenix single on the Dragon", () => {
     expect(
       classify({ cards: cards("Ph") }, { type: "single", rank: 15, length: 1 }),

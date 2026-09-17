@@ -1,9 +1,9 @@
 import { Schema } from "effect";
 import { Card, Rank } from "../kernel/cards.ts";
-import { Combination } from "../kernel/combination.ts";
+import { PassCommand, PlayCommand, PlayDecision, Reactions } from "../kernel/choices.ts";
 import { DragonGiven, Passed, Played, SeatFinished, TrickWon } from "../kernel/events.ts";
 import { Layout, Seat } from "../kernel/layout.ts";
-import type { KernelState } from "../kernel/trick.ts";
+import { TrickEntry, type KernelState } from "../kernel/trick.ts";
 
 export const StandardSettings = Schema.Struct({
   targetScore: Schema.Int.check(Schema.isGreaterThan(0)),
@@ -29,13 +29,6 @@ export const ExchangeCommand = Schema.TaggedStruct("Exchange", {
   seat: Seat,
   gives: Schema.Array(Give),
 });
-export const PlayCommand = Schema.TaggedStruct("Play", {
-  seat: Seat,
-  cards: Schema.Array(Card),
-  phoenixAs: Schema.optionalKey(Rank),
-  wish: Schema.optionalKey(Rank),
-});
-export const PassCommand = Schema.TaggedStruct("Pass", { seat: Seat });
 export const GiftDragonCommand = Schema.TaggedStruct("GiftDragon", { seat: Seat, to: Seat });
 
 export const StandardCommand = Schema.Union([
@@ -137,6 +130,7 @@ export interface StandardRound {
 }
 
 export interface StandardState {
+  readonly variant: "standard";
   readonly layout: Layout;
   readonly settings: StandardSettings;
   readonly totals: ReadonlyArray<number>;
@@ -147,42 +141,16 @@ export interface StandardState {
 
 // Decisions, Reactions, Observation
 
-export const PlayOption = Schema.Struct({
-  cards: Schema.Array(Card),
-  phoenixAs: Schema.optionalKey(Rank),
-  combination: Combination,
-});
-export type PlayOption = typeof PlayOption.Type;
-
-export const WISH_RANKS: ReadonlyArray<Rank> = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
-
-export const Decision = Schema.Union([
+export const StandardDecision = Schema.Union([
   Schema.TaggedStruct("GrandTichu", { id: Schema.String, seat: Seat }),
   /** Give one card from the Hand to each Seat in `to`. */
   Schema.TaggedStruct("Exchange", { id: Schema.String, seat: Seat, to: Schema.Array(Seat) }),
-  /** Lay one of `plays` (with an optional Wish when it holds the Mah Jong) or Pass if allowed. */
-  Schema.TaggedStruct("Play", {
-    id: Schema.String,
-    seat: Seat,
-    plays: Schema.Array(PlayOption),
-    canPass: Schema.Boolean,
-  }),
+  PlayDecision,
   Schema.TaggedStruct("DragonGift", { id: Schema.String, seat: Seat, to: Schema.Array(Seat) }),
 ]);
-export type Decision = typeof Decision.Type;
+export type StandardDecision = typeof StandardDecision.Type;
 
-export const Reactions = Schema.Struct({
-  callTichu: Schema.Boolean,
-  bombs: Schema.Array(PlayOption),
-});
-export type Reactions = typeof Reactions.Type;
-
-export const PublicTrickEntry = Schema.Union([
-  Schema.TaggedStruct("Play", { seat: Seat, cards: Schema.Array(Card), combination: Combination }),
-  Schema.TaggedStruct("Pass", { seat: Seat }),
-]);
-
-export const Observation = Schema.Struct({
+export const StandardObservation = Schema.Struct({
   variant: Schema.Literal("standard"),
   seat: Seat,
   layout: Layout,
@@ -202,7 +170,7 @@ export const Observation = Schema.Struct({
       /** The cards this Seat gave, once submitted, and received, once the Exchange completed. */
       given: Schema.Array(Give),
       received: Schema.Array(Schema.Struct({ from: Seat, card: Card })),
-      trick: Schema.Array(PublicTrickEntry),
+      trick: Schema.Array(TrickEntry),
       turn: Schema.NullOr(Seat),
       wish: Schema.NullOr(Rank),
       finished: Schema.Array(Seat),
@@ -211,7 +179,7 @@ export const Observation = Schema.Struct({
       pendingGift: Schema.NullOr(Seat),
     }),
   ),
-  decision: Schema.NullOr(Decision),
+  decision: Schema.NullOr(StandardDecision),
   reactions: Reactions,
 });
-export type Observation = typeof Observation.Type;
+export type StandardObservation = typeof StandardObservation.Type;

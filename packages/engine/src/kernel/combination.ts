@@ -77,7 +77,8 @@ export const classify = (
         return make("dog", 0, 1);
       case "Phoenix": {
         if (top === undefined || top.type !== "single") return make("single", 1.5, 1);
-        if (top.rank >= DRAGON_RANK) return undefined;
+        // Never on the Dragon, and never on another Phoenix (the only single with a half rank).
+        if (top.rank >= DRAGON_RANK || !Number.isInteger(top.rank)) return undefined;
         return make("single", top.rank + 0.5, 1);
       }
     }

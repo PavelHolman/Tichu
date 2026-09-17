@@ -4,7 +4,7 @@ import { Combination, beats, classify, type KernelOptions, type PlayCards } from
 import { combinationsInHand, type CombinationOption } from "./enumerate.ts";
 import { violation, type RuleViolation } from "./errors.ts";
 import type { DragonGiven, KernelEvent, Passed, Played } from "./events.ts";
-import { Seat, nextSeatWhere, opponentsOf, partnerOf, type Layout } from "./layout.ts";
+import { Seat, opponentsOf, partnerOf, type Layout } from "./layout.ts";
 
 export const TrickEntry = Schema.Union([
   Schema.TaggedStruct("Play", {
@@ -21,6 +21,8 @@ export interface KernelState {
   readonly layout: Layout;
   readonly options: KernelOptions;
   readonly dragonGift: boolean;
+  /** Play order of the Round: every Seat once, the next Seat after each. */
+  readonly order: ReadonlyArray<Seat>;
   readonly hands: ReadonlyArray<ReadonlyArray<CardType>>;
   /** Plays and Passes on the open Trick, oldest first. */
   readonly trick: ReadonlyArray<TrickEntry>;
@@ -43,10 +45,13 @@ export interface KernelSetup {
   readonly dragonGift: boolean;
   readonly hands: ReadonlyArray<ReadonlyArray<CardType>>;
   readonly turn: Seat | null;
+  /** Defaults to Seat 0 upward. */
+  readonly order?: ReadonlyArray<Seat>;
 }
 
 export const makeKernel = (setup: KernelSetup): KernelState => ({
   ...setup,
+  order: setup.order ?? Array.from({ length: setup.layout.seats }, (_, seat) => seat),
   trick: [],
   passes: [],
   wish: null,
@@ -66,9 +71,18 @@ export const holds = (state: KernelState, seat: Seat): boolean =>
 export const holders = (state: KernelState): Array<Seat> =>
   state.hands.flatMap((hand, seat) => (hand.length > 0 ? [seat] : []));
 
+/** The first Seat after `seat` in play order (or `seat` itself when `inclusive`) that holds cards. */
+const nextHolder = (state: KernelState, seat: Seat, inclusive = false): Seat | null => {
+  const start = state.order.indexOf(seat);
+  for (let offset = inclusive ? 0 : 1; offset < state.order.length; offset++) {
+    const candidate = state.order[(start + offset) % state.order.length];
+    if (candidate !== undefined && holds(state, candidate)) return candidate;
+  }
+  return null;
+};
+
 /** The Seat that leads after `seat` won a Trick: itself if it still holds cards, else the next holder. */
-const leadFrom = (state: KernelState, seat: Seat): Seat | null =>
-  nextSeatWhere(state.layout, seat, (other) => holds(state, other), true) ?? null;
+const leadFrom = (state: KernelState, seat: Seat): Seat | null => nextHolder(state, seat, true);
 
 export const topPlay = (state: KernelState): Extract<TrickEntry, { _tag: "Play" }> | undefined => {
   for (let index = state.trick.length - 1; index >= 0; index--) {
@@ -113,7 +127,7 @@ export const evolveKernel = (state: KernelState, event: KernelEvent): KernelStat
           { _tag: "Play", seat: event.seat, cards: event.cards, combination: event.combination },
         ],
         passes: [],
-        turn: nextSeatWhere(state.layout, event.seat, (seat) => holds(afterHands, seat)) ?? null,
+        turn: nextHolder(afterHands, event.seat),
       };
     }
     case "Passed":
@@ -121,7 +135,7 @@ export const evolveKernel = (state: KernelState, event: KernelEvent): KernelStat
         ...state,
         trick: [...state.trick, { _tag: "Pass", seat: event.seat }],
         passes: [...state.passes, event.seat],
-        turn: nextSeatWhere(state.layout, event.seat, (seat) => holds(state, seat)) ?? null,
+        turn: nextHolder(state, event.seat),
         actions: state.actions + 1,
       };
     case "SeatFinished":

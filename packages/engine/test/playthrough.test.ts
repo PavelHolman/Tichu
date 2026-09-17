@@ -1,7 +1,7 @@
 import { assert, describe, expect, it } from "@effect/vitest";
 import { Effect, Random, Schema } from "effect";
 import {
-  Observation,
+  StandardObservation,
   StandardEvent,
   decide,
   emptyStandardState,
@@ -11,7 +11,7 @@ import {
   reactions,
   replay,
   start,
-  type Decision,
+  type StandardDecision,
   type StandardCommand,
   type StandardEvent as StandardEventType,
   type StandardState,
@@ -24,7 +24,7 @@ const pick = <A>(items: ReadonlyArray<A>) =>
     return items[index] as A;
   });
 
-const answer = (state: StandardState, decision: Decision) =>
+const answer = (state: StandardState, decision: StandardDecision) =>
   Effect.gen(function* () {
     switch (decision._tag) {
       case "GrandTichu":
@@ -91,7 +91,7 @@ const cardsInPlay = (state: StandardState): number => {
 };
 
 const isEvent = Schema.is(StandardEvent);
-const encodeObservation = Schema.encodeUnknownSync(Observation);
+const encodeObservation = Schema.encodeUnknownSync(StandardObservation);
 
 const playMatch = (seed: string) =>
   Effect.gen(function* () {
