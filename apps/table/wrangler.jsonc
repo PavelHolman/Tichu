@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tichu-table",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": { "bindings": [{ "name": "TABLE", "class_name": "Table" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Table"] }],
+  "r2_buckets": [{ "binding": "CORPUS", "bucket_name": "tichu-corpus" }],
+  "observability": { "enabled": true },
+}
