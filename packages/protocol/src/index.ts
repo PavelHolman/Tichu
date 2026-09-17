@@ -1,4 +1,4 @@
-import { Observation, Seat, StandardCommand, StandardEvent, StandardSettings } from "@tichu/engine";
+import { GameCommand, GameEvent, GameSettings, Observation, Seat } from "@tichu/engine";
 import { Schema } from "effect";
 
 export const BotTier = Schema.Literals(["random", "heuristic"]);
@@ -16,16 +16,15 @@ export const SeatToken = Schema.String.check(Schema.isPattern(/^[0-9a-f]{32}$/))
 export const TableId = Schema.String.check(Schema.isPattern(/^[0-9A-Za-z]{10}$/));
 
 export const TableSettings = Schema.Struct({
-  variant: Schema.Literal("standard"),
-  match: StandardSettings,
+  /** The Variant and its Match settings; the Seat count follows from it. */
+  game: GameSettings,
   /** Seconds a disconnected Seat with a pending Decision waits before a Bot answers. */
   takeoverGraceSeconds: Schema.Int.check(Schema.isBetween({ minimum: 5, maximum: 600 })),
 });
 export type TableSettings = typeof TableSettings.Type;
 
 export const defaultTableSettings: TableSettings = {
-  variant: "standard",
-  match: { targetScore: 1000 },
+  game: { _tag: "Standard", match: { targetScore: 1000 } },
   takeoverGraceSeconds: 30,
 };
 
@@ -68,9 +67,9 @@ export type HttpError = typeof HttpError.Type;
 
 export const ClientMessage = Schema.Union([
   /** Answers the pending Decision named by `decisionId`. */
-  Schema.TaggedStruct("Answer", { decisionId: Schema.String, command: StandardCommand }),
+  Schema.TaggedStruct("Answer", { decisionId: Schema.String, command: GameCommand }),
   /** Volunteers a Reaction; `seenSeq` is the last sequence number the client had. */
-  Schema.TaggedStruct("React", { seenSeq: Schema.Int, command: StandardCommand }),
+  Schema.TaggedStruct("React", { seenSeq: Schema.Int, command: GameCommand }),
   Schema.TaggedStruct("FillSeat", { seat: Seat, tier: BotTier }),
   Schema.TaggedStruct("EmptySeat", { seat: Seat }),
   Schema.TaggedStruct("ReleaseSeat", { seat: Seat }),
@@ -106,7 +105,7 @@ export const ServerMessage = Schema.Union([
   /** One per event (redacted for this Seat) or Table change, with the resulting Observation. */
   Schema.TaggedStruct("Update", {
     seq: Schema.Int,
-    event: Schema.NullOr(StandardEvent),
+    event: Schema.NullOr(GameEvent),
     table: TableView,
     observation: Schema.NullOr(Observation),
   }),
