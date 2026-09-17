@@ -17,9 +17,29 @@
         "vitest": "5.0.1",
       },
     },
+    "packages/bots": {
+      "name": "@tichu/bots",
+      "dependencies": {
+        "@tichu/engine": "workspace:*",
+        "effect": "4.0.0-rc.115",
+      },
+      "devDependencies": {
+        "@effect/vitest": "4.0.0-rc.115",
+      },
+    },
     "packages/engine": {
       "name": "@tichu/engine",
       "dependencies": {
+        "effect": "4.0.0-rc.115",
+      },
+      "devDependencies": {
+        "@effect/vitest": "4.0.0-rc.115",
+      },
+    },
+    "packages/protocol": {
+      "name": "@tichu/protocol",
+      "dependencies": {
+        "@tichu/engine": "workspace:*",
         "effect": "4.0.0-rc.115",
       },
       "devDependencies": {
@@ -192,7 +212,11 @@
 
     "@simple-libs/stream-utils": ["@simple-libs/stream-utils@2.0.0", "", {}, "sha512-fCTuZK4QBa+39Oz9l4OGfJfz+GpwCp3AqO7Zch3to99xHPgstVsRFpeQ8LNd2o1Gv8raL2mCFwiaHh7bFSp5DQ=="],
 
+    "@tichu/bots": ["@tichu/bots@workspace:packages/bots"],
+
     "@tichu/engine": ["@tichu/engine@workspace:packages/engine"],
+
+    "@tichu/protocol": ["@tichu/protocol@workspace:packages/protocol"],
 
     "@types/chai": ["@types/chai@5.2.3", "", { "dependencies": { "@types/deep-eql": "*", "assertion-error": "^2.0.1" } }, "sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA=="],
 
