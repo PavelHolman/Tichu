@@ -12,3 +12,5 @@ Compile every resolved ticket into `.scratch/tichu/spec.md`: architecture overvi
 ## Answer
 
 Written: [spec.md](../spec.md), 2026-09-17. Thirteen sections compiling every resolved ticket, pointing at CONTEXT.md, the two ADRs and the three prototype branches, with a suggested build order. Nothing in it is undecided; the map is complete.
+
+Published as GitHub issue: https://github.com/PavelHolman/Tichu/issues/1 (2026-09-17).

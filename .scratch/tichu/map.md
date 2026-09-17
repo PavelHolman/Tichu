@@ -5,7 +5,7 @@ Tracker: local markdown (see `.scratch/tichu/issues/`)
 
 ## Destination
 
-**Reached 2026-09-17: see `spec.md`.**
+**Reached 2026-09-17: see `spec.md`, published as [issue #1](https://github.com/PavelHolman/Tichu/issues/1).**
 
 A handoff spec at `.scratch/tichu/spec.md`: stack, architecture, domain model, realtime protocol, persistence, bot interface, and UI direction all decided, with nothing left to decide before build tickets are cut. Scope is standard Tichu for four Participants (humans and simple Bots), synchronous play, joined by link, plus the Grand Seigneur Variant designed on the same engine (pulled in 2026-09-17).
 
