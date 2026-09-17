@@ -1,4 +1,4 @@
-import type { Observation, StandardEvent } from "@tichu/engine";
+import type { GameEvent, Observation } from "@tichu/engine";
 import {
   PING,
   PING_INTERVAL_MILLIS,
@@ -31,12 +31,12 @@ export class TableClient {
   observation = $state<Observation | null>(null);
   you = $state<number | null>(null);
   seq = $state(0);
-  lastEvent = $state<StandardEvent | null>(null);
+  lastEvent = $state<GameEvent | null>(null);
   rejection = $state<string | null>(null);
 
   private socket: WebSocket | null = null;
   private readonly fiber: Fiber.Fiber<void, ConnectionLost>;
-  private readonly listeners = new Set<(event: StandardEvent) => void>();
+  private readonly listeners = new Set<(event: GameEvent) => void>();
 
   constructor(
     private readonly tableId: string,
@@ -115,7 +115,7 @@ export class TableClient {
   }
 
   /** Subscribes to every event as it arrives; returns the unsubscribe function. */
-  onEvent(listener: (event: StandardEvent) => void): () => void {
+  onEvent(listener: (event: GameEvent) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }

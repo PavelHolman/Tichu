@@ -13,6 +13,7 @@
   let error = $state<string | null>(null);
   let joining = $state(false);
 
+  const standard = $derived(table.settings.game._tag === "Standard");
   const partnerOf = (seat: number) => (seat + 2) % table.seats.length;
   const occupantName = (seat: number) => {
     const occupant = table.seats[seat];
@@ -46,7 +47,11 @@
   </div>
   <div class="flex flex-col gap-2">
     <h2 class="text-sm font-medium">Choose a Seat</h2>
-    <p class="text-xs text-neutral-400">Your partner sits opposite you.</p>
+    <p class="text-xs text-neutral-400">
+      {standard
+        ? "Your partner sits opposite you."
+        : "Grand Seigneur: every Player for themselves."}
+    </p>
     <div class="grid grid-cols-2 gap-2">
       {#each table.seats as occupant, seat (seat)}
         {@const partner = occupantName(partnerOf(seat))}
@@ -58,7 +63,11 @@
         >
           <span class="font-semibold">Seat {seat + 1}</span>
           <span class="text-xs font-normal text-neutral-400">
-            {occupant === null ? (partner ? `partner: ${partner}` : "free") : occupantName(seat)}
+            {occupant === null
+              ? standard && partner
+                ? `partner: ${partner}`
+                : "free"
+              : occupantName(seat)}
           </span>
         </Button>
       {/each}

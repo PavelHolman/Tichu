@@ -1,6 +1,7 @@
 <script lang="ts">
   import { page } from "$app/state";
   import GameTable from "$lib/components/game/GameTable.svelte";
+  import SeigneurTable from "$lib/components/game/SeigneurTable.svelte";
   import JoinForm from "$lib/components/table/JoinForm.svelte";
   import Lobby from "$lib/components/table/Lobby.svelte";
   import { getTable } from "$lib/connection/api.js";
@@ -66,8 +67,10 @@
       <p>This Table was closed.</p>
       <a class="underline" href="/">Start a new one</a>
     </main>
-  {:else if client.observation !== null}
+  {:else if client.observation?.variant === "standard"}
     <GameTable {client} table={client.table} observation={client.observation} />
+  {:else if client.observation?.variant === "grandSeigneur"}
+    <SeigneurTable {client} table={client.table} observation={client.observation} />
   {/if}
 {:else if client !== null}
   <main class="flex min-h-dvh items-center justify-center text-neutral-300">

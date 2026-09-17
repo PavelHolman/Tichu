@@ -10,7 +10,7 @@ export const seatName = (table: TableView, seat: number, you: number | null): st
   return `${occupant.tier === "random" ? "Easy Bot" : "Bot"} ${seat + 1}`;
 };
 
-type TrickEntry = NonNullable<Observation["round"]>["trick"][number];
+export type TrickEntry = NonNullable<Observation["round"]>["trick"][number];
 
 /** The latest entries of the Trick as one line, oldest first: "Kim: pair of 4s · Anna passed". */
 export const trickHistory = (
@@ -26,3 +26,5 @@ export const trickHistory = (
         : `${name(entry.seat)}: ${describeCombination(entry)}`,
     )
     .join(" · ");
+
+export const cardCount = (count: number): string => `${count} ${count === 1 ? "card" : "cards"}`;

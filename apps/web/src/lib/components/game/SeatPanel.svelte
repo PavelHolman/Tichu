@@ -6,21 +6,36 @@
     name,
     occupant,
     count,
-    call,
     turn,
-    place,
-    waiting,
+    out = false,
+    waiting = false,
+    badge = null,
+    badgeTone = "violet",
+    status,
     now,
+    compact = false,
   }: {
     name: string;
     occupant: Occupant | null;
     count: number;
-    call: "none" | "tichu" | "grandTichu";
     turn: boolean;
-    place: number | null;
-    waiting: boolean;
+    out?: boolean;
+    waiting?: boolean;
+    /** A short label beside the name: a Call, or a hierarchy title. */
+    badge?: string | null;
+    badgeTone?: "violet" | "red" | "gold" | "neutral";
+    status: string;
     now: number;
+    /** Drops the card backs for crowded Tables. */
+    compact?: boolean;
   } = $props();
+
+  const TONES = {
+    violet: "bg-violet-700 text-white",
+    red: "bg-red-800 text-white",
+    gold: "bg-[var(--gold)] text-neutral-900",
+    neutral: "bg-white/15 text-neutral-100",
+  } as const;
 
   const away = $derived(occupant?._tag === "Player" && !occupant.connected);
   const takeoverIn = $derived(
@@ -30,30 +45,20 @@
   );
 </script>
 
-<div class="flex flex-col items-center gap-1 text-xs">
-  <CardBacks {count} />
-  <div class="flex items-center gap-1">
-    <span class="font-semibold {turn ? 'text-[var(--gold)]' : ''}">
+<div class="flex flex-col items-center gap-1 text-xs" class:opacity-50={out}>
+  {#if !compact}<CardBacks {count} />{/if}
+  <div class="flex max-w-28 items-center gap-1">
+    <span class="truncate font-semibold {turn ? 'text-[var(--gold)]' : ''}">
       {occupant?._tag === "Bot" ? "🤖 " : ""}{name}
     </span>
-    {#if call !== "none"}
-      <span
-        class="rounded-full px-1.5 py-px text-[10px] text-white {call === 'grandTichu'
-          ? 'bg-red-800'
-          : 'bg-violet-700'}"
-      >
-        {call === "grandTichu" ? "Grand Tichu" : "Tichu"}
-      </span>
-    {/if}
   </div>
-  <div class="text-neutral-300">
-    {#if place !== null}
-      out {place === 1 ? "1st" : place === 2 ? "2nd" : "3rd"}
-    {:else}
-      {count} cards
-    {/if}
-    {#if turn}<span class="text-[var(--gold)]"> · to play</span>{/if}
-    {#if waiting}<span class="text-neutral-400"> · deciding</span>{/if}
+  {#if badge !== null}
+    <span class="rounded-full px-1.5 py-px text-[10px] {TONES[badgeTone]}">{badge}</span>
+  {/if}
+  <div class="flex flex-col items-center text-center text-neutral-300">
+    <span>{status}</span>
+    {#if turn}<span class="text-[var(--gold)]">to play</span>{/if}
+    {#if waiting}<span class="text-neutral-400">deciding</span>{/if}
   </div>
   {#if away}
     <div class="text-[10px] text-red-300">
