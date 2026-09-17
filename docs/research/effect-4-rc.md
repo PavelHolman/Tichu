@@ -1,6 +1,6 @@
 # Effect 4.0 RC: what it gives us and what it breaks
 
-Research for ticket `../issues/02-effect-4-rc.md`. Date of research: 2026-09-17.
+Research for ticket GitHub issue #5. Date of research: 2026-09-17.
 Sources are primary only: the npm registry, the `effect@4.0.0-rc.115` tarball (source + bundled docs), the `Effect-TS/effect` GitHub repo, and effect.website (docs + first-party blog). Two empirical checks were run locally (a workerd smoke test and a Vitest 5 smoke test); their setup is described inline so they can be reproduced. Anything not backed by one of those is marked UNVERIFIED.
 
 ## Summary and recommendation

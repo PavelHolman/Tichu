@@ -1,6 +1,6 @@
 # Temporal-only time and no-throw enforcement with oxlint/oxfmt; git-hook wiring under Bun
 
-Resolves: `../issues/03-temporal-and-lint.md`
+Resolves: GitHub issue #6
 Researched: 2026-09-17, against primary sources only (docs, release notes, GitHub sources/PRs, npm registry, MDN compat data). Every claim carries its source URL. Anything not confirmed from a primary source is marked **UNVERIFIED**.
 
 Package versions below were read from the npm registry on 2026-09-17 (`npm view <pkg> version time.modified`).

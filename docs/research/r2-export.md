@@ -1,6 +1,6 @@
 # Research: Can the free tier hold the Match event-log corpus in R2?
 
-Resolves: `../issues/18-r2-export.md`
+Resolves: GitHub issue #21
 Date: 2026-09-17
 Method: primary sources only (developers.cloudflare.com; docs.github.com for the GitHub fallback). Every claim carries the URL it was read from. Claims not backed by a page are marked **UNVERIFIED**. No sub-agents; all pages were read in this session.
 

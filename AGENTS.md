@@ -1,12 +1,12 @@
 # Tichu
 
-A web app where friends play the card game Tichu together, with bots filling empty seats. Planning is in progress; see `.scratch/tichu/map.md`.
+A web app where friends play the card game Tichu together, with bots filling empty seats. Planning is complete; the handoff spec is GitHub issue #1 and the wayfinder map is issue #3.
 
 ## Agent skills
 
 ### Issue tracker
 
-Issues, specs, and the wayfinder map live as markdown under `.scratch/<feature>/`. See `docs/agents/issue-tracker.md`.
+Issues, specs, and wayfinder maps live in this repo's GitHub Issues (`gh` CLI). Research findings live in `docs/research/`. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

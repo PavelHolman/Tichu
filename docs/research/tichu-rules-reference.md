@@ -1,6 +1,6 @@
 # Tichu rules reference (canonical rules, edge cases, variants)
 
-Resolves issue `../issues/04-tichu-rules-reference.md`. Written 2026-09-17.
+Resolves issue GitHub issue #7. Written 2026-09-17.
 Terms follow `CONTEXT.md`: Table, Seat, Team, Participant, Match, Round, Hand, Trick, Play, Combination, Pass, Bomb, Call, Exchange, Wish, Dragon Gift, Mah Jong, Dog, Phoenix, Dragon.
 
 ## Sources
@@ -150,7 +150,7 @@ Note on direction of play: FM-EN/FM-DE/RGG all say play proceeds to the **right*
 
 ## Part 2 - Edge cases: where the official text is silent/ambiguous, or implementations diverge
 
-Legend: **Official** = what FM-EN / FM-DE / FM-FAQ / RGG say. **Practice** = what accessible secondary sources and online implementations do. **Recommendation** = the option best supported by the official text (or, failing that, majority practice); the engine grilling (issue 05) makes the final call. Secondary sources used here:
+Legend: **Official** = what FM-EN / FM-DE / FM-FAQ / RGG say. **Practice** = what accessible secondary sources and online implementations do. **Recommendation** = the option best supported by the official text (or, failing that, majority practice); the engine grilling (issue 05 (#8)) makes the final call. Secondary sources used here:
 
 - **[BSW]** BrettspielWelt Tichu guide. <https://www.brettspielwelt.de/Hilfe/Anleitungen/Tichu/>
 - **[BGA-HELP]** Board Game Arena "Gamehelptichu". <https://en.doc.boardgamearena.com/Gamehelptichu>
@@ -283,6 +283,6 @@ House rules and platform options (all secondary, UNVERIFIED against publisher te
 - **Dealing 8 + 6 and playing clockwise** - described as permitted procedural variants by RGG and AARON; identical to the official game. [RGG FAQ; AARON]
 - **Alternative German tournament scoring** - "DTM" association rules with 2/1 match points, four-deal rounds. [spielen.de thread <https://www.spielen.de/forum/viewtopic.php?t=169365> - reported by the sweep, UNVERIFIED]
 
-## Open items for the engine grilling (issue 05)
+## Open items for the engine grilling (issue 05 (#8))
 
 E-W3 (Wish subset computation), E-W6 (Dog vs Wish), E-B2/E-B4 (Bomb window design), E-C4 (Grand Tichu simultaneous vs sequential), E-S1 (tie/target/fixed-Rounds Match modes), E-P3 (explicit Phoenix rank in a Play), E-D1 (auto Dragon Gift).

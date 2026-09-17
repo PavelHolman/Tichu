@@ -1,6 +1,6 @@
 # Spike 14: SvelteKit Worker + Table Durable Object Worker, end to end under `wrangler dev`
 
-Research for ticket `../issues/14-sveltekit-do-spike.md`. Date: 2026-09-17. Everything below was run locally on workerd via `wrangler dev` (no Cloudflare account, no deploy; production bundling verified with `wrangler deploy --dry-run`). Spike source is left in the scratchpad at `/private/tmp/claude-501/-Users-pavelholman-Dev-Tichu--claude-worktrees-tichu-game-web-app-920e6a/f36e6455-b92b-4cb6-baa0-6569ab14bde1/scratchpad/spike` (`apps/table`, `apps/web`, `ws-client.ts`, `*.log`).
+Research for ticket GitHub issue #17. Date: 2026-09-17. Everything below was run locally on workerd via `wrangler dev` (no Cloudflare account, no deploy; production bundling verified with `wrangler deploy --dry-run`). Spike source is left in the scratchpad at `/private/tmp/claude-501/-Users-pavelholman-Dev-Tichu--claude-worktrees-tichu-game-web-app-920e6a/f36e6455-b92b-4cb6-baa0-6569ab14bde1/scratchpad/spike` (`apps/table`, `apps/web`, `ws-client.ts`, `*.log`).
 
 ## Summary
 

@@ -1,6 +1,6 @@
 # Research: Can the free Cloudflare tier host an authoritative Tichu Table?
 
-Resolves: `../issues/01-cloudflare-durable-objects.md`
+Resolves: GitHub issue #4
 Date: 2026-09-17
 Method: primary sources only (developers.cloudflare.com, svelte.dev/docs/kit, effect.website, GitHub issues in Effect-TS, sveltejs, cloudflare). Every claim carries the URL it was read from. Claims not backed by a page are marked **UNVERIFIED**.
 
