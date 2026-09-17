@@ -1,7 +1,7 @@
 import { assert, describe, expect, it } from "@effect/vitest";
 import {
-  decide,
   emptyStandardState,
+  game,
   makeKernel,
   normal,
   observe,
@@ -11,7 +11,8 @@ import {
   start,
   type CallKind,
   type Card,
-  type StandardCommand,
+  type GameCommand,
+  type GameState,
   type StandardState,
 } from "@tichu/engine";
 import { Effect, Random } from "effect";
@@ -57,9 +58,9 @@ const inPlay = (
   };
 };
 
-const step = (state: StandardState, command: StandardCommand) =>
-  decide(state, command).pipe(
-    Effect.map((events) => replay(events, state)),
+const step = <S extends GameState>(state: S, command: GameCommand) =>
+  game.decide(state, command).pipe(
+    Effect.map((events) => game.replay(events, state) as S),
     Effect.orDie,
   );
 
@@ -202,5 +203,44 @@ describe("heuristic Bot", () => {
         expect(wins).toBeGreaterThanOrEqual(15);
       }),
     120_000,
+  );
+});
+
+describe("Bots in Grand Seigneur", () => {
+  it.effect(
+    "play several hierarchy Rounds at seven Seats with two Decks",
+    () =>
+      Effect.gen(function* () {
+        const seats = [
+          heuristicBot,
+          randomBot,
+          heuristicBot,
+          randomBot,
+          heuristicBot,
+          randomBot,
+          heuristicBot,
+        ];
+        let state = game.replay(
+          yield* game.start({ _tag: "GrandSeigneur", match: { seats: 7, decks: 2 } }),
+        );
+        let rounds = 0;
+        for (let turn = 0; turn < 20_000 && rounds < 4; turn++) {
+          for (let seat = 0; seat < seats.length; seat++) {
+            const reaction = yield* seats[seat]!.react(game.observe(state, seat));
+            if (reaction !== undefined) state = yield* step(state, reaction);
+          }
+          const decision = game.pendingDecisions(state)[0];
+          assert.isDefined(decision);
+          const command = yield* seats[decision.seat]!.decide(
+            game.observe(state, decision.seat),
+            decision,
+          );
+          const events = yield* game.decide(state, command).pipe(Effect.orDie);
+          rounds += events.filter((event) => event._tag === "HierarchySet").length;
+          state = game.replay(events, state);
+        }
+        expect(rounds).toBe(4);
+      }).pipe(Random.withSeed("seigneur-bots")),
+    60_000,
   );
 });

@@ -1,13 +1,14 @@
 import {
   WISH_RANKS,
   areTeammates,
+  bestCardValue,
   combinationsInHand,
   sameCard,
   type Card,
   type Decision,
+  type GameCommand,
   type Observation,
   type PlayOption,
-  type StandardCommand,
 } from "@tichu/engine";
 import { Effect, Random } from "effect";
 
@@ -20,9 +21,9 @@ export type BotTier = "random" | "heuristic";
 export interface Bot {
   readonly tier: BotTier;
   /** Answers a Decision the engine requires with one of its legal options. */
-  readonly decide: (observation: Observation, decision: Decision) => Effect.Effect<StandardCommand>;
+  readonly decide: (observation: Observation, decision: Decision) => Effect.Effect<GameCommand>;
   /** Volunteers a Reaction (a Call or an out-of-turn Bomb), or nothing. */
-  readonly react: (observation: Observation) => Effect.Effect<StandardCommand | undefined>;
+  readonly react: (observation: Observation) => Effect.Effect<GameCommand | undefined>;
 }
 
 const pick = <A>(items: ReadonlyArray<A>): Effect.Effect<A | undefined> =>
@@ -30,7 +31,7 @@ const pick = <A>(items: ReadonlyArray<A>): Effect.Effect<A | undefined> =>
     ? Effect.succeed(undefined)
     : Random.nextIntBetween(0, items.length - 1).pipe(Effect.map((index) => items[index]));
 
-const playCommand = (seat: number, option: PlayOption, wish?: number): StandardCommand => ({
+const playCommand = (seat: number, option: PlayOption, wish?: number): GameCommand => ({
   _tag: "Play",
   seat,
   cards: option.cards,
@@ -43,7 +44,7 @@ const hand = (observation: Observation): ReadonlyArray<Card> => observation.roun
 export const randomBot: Bot = {
   tier: "random",
   decide: (observation, decision) =>
-    Effect.gen(function* () {
+    Effect.gen(function* (): Effect.fn.Return<GameCommand> {
       switch (decision._tag) {
         case "GrandTichu":
           return { _tag: "GrandTichu", seat: decision.seat, call: false };
@@ -65,6 +66,16 @@ export const randomBot: Bot = {
         }
         case "DragonGift":
           return { _tag: "GiftDragon", seat: decision.seat, to: (yield* pick(decision.to)) ?? 0 };
+        case "ForcedGive":
+          return { _tag: "GiveBest", seat: decision.seat, cards: decision.suggested };
+        case "ReturnCards": {
+          const shuffled = yield* Random.shuffle(hand(observation));
+          return {
+            _tag: "ReturnCards",
+            seat: decision.seat,
+            cards: shuffled.slice(0, decision.count),
+          };
+        }
       }
     }),
   react: () => Effect.succeed(undefined),
@@ -92,6 +103,9 @@ const cardValue = (card: Card): number => {
       return 15;
   }
 };
+
+const weakest = (cards: ReadonlyArray<Card>) =>
+  cards.toSorted((a, b) => bestCardValue(a) - bestCardValue(b));
 
 const bombCards = (cards: ReadonlyArray<Card>): ReadonlyArray<Card> =>
   combinationsInHand(cards)
@@ -135,8 +149,12 @@ const bombWorthy = (observation: Observation): boolean => {
   if (round === null || top === undefined) return false;
   const { layout, seat } = observation;
   if (areTeammates(layout, seat, top.seat)) return false;
-  const called = (other: number) =>
-    round.calls[other] !== "none" && !round.finished.includes(other);
+  if (observation.variant === "grandSeigneur") {
+    // No Calls: spend a Bomb only to stop someone about to go out.
+    return (observation.round?.handCounts[top.seat] ?? 99) <= 2;
+  }
+  const calls = observation.round?.calls ?? [];
+  const called = (other: number) => calls[other] !== "none" && !round.finished.includes(other);
   const team = layout.teams.find((members) => members.includes(seat)) ?? [seat];
   return called(top.seat) || team.some(called);
 };
@@ -145,15 +163,15 @@ const lead = (
   observation: Observation,
   options: ReadonlyArray<PlayOption>,
 ): PlayOption | undefined => {
-  const round = observation.round;
   const partner = partnerOf(observation);
   const dog = options.find((option) => option.combination.type === "dog");
+  const standardRound = observation.variant === "standard" ? observation.round : null;
   if (
     dog !== undefined &&
     partner !== undefined &&
-    round !== null &&
-    round.calls[partner] !== "none" &&
-    !round.finished.includes(partner)
+    standardRound !== null &&
+    standardRound.calls[partner] !== "none" &&
+    !standardRound.finished.includes(partner)
   ) {
     return dog;
   }
@@ -182,7 +200,7 @@ const wishFor = (observation: Observation): number => {
 export const heuristicBot: Bot = {
   tier: "heuristic",
   decide: (observation, decision) =>
-    Effect.sync((): StandardCommand => {
+    Effect.sync((): GameCommand => {
       const cards = hand(observation);
       switch (decision._tag) {
         case "GrandTichu": {
@@ -254,17 +272,31 @@ export const heuristicBot: Bot = {
           const to = decision.to.toSorted((a, b) => (counts[b] ?? 0) - (counts[a] ?? 0))[0] ?? 0;
           return { _tag: "GiftDragon", seat: decision.seat, to };
         }
+        case "ForcedGive":
+          return { _tag: "GiveBest", seat: decision.seat, cards: decision.suggested };
+        case "ReturnCards": {
+          // Return the weakest cards, keeping Bombs intact where possible.
+          const kept = bombCards(cards);
+          const loose = weakest(cards.filter((card) => !kept.some((bomb) => sameCard(bomb, card))));
+          const chosen = (loose.length >= decision.count ? loose : weakest(cards)).slice(
+            0,
+            decision.count,
+          );
+          return { _tag: "ReturnCards", seat: decision.seat, cards: chosen };
+        }
       }
     }),
   react: (observation) =>
     Effect.sync(() => {
-      const round = observation.round;
-      if (round === null) return undefined;
+      if (observation.round === null) return undefined;
       const { reactions, seat } = observation;
       if (reactions.bombs.length > 0 && bombWorthy(observation)) {
         const bomb = cheapest(reactions.bombs);
         if (bomb !== undefined) return playCommand(seat, bomb);
       }
+      if (observation.variant !== "standard") return undefined;
+      const round = observation.round;
+      if (round === null) return undefined;
       const nobodyCalled = round.calls.every((call) => call === "none");
       if (
         reactions.callTichu &&
