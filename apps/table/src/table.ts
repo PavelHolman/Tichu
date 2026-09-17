@@ -260,7 +260,14 @@ export class Table extends DurableObject<Env> {
         return httpError(426, "UpgradeRequired", "Expected a WebSocket upgrade");
       }
       const seat = seatForToken(state.record, url.searchParams.get("token") ?? "");
-      if (seat === undefined) return httpError(401, "NotSeated", "Unknown Seat token");
+      if (seat === undefined) {
+        // Browsers cannot read an upgrade's HTTP status, so refuse over the socket itself.
+        const [client, server] = Object.values(new WebSocketPair()) as [WebSocket, WebSocket];
+        server.accept();
+        this.send(server, { _tag: "Rejected", reason: "NotSeated", message: "Unknown Seat token" });
+        server.close(4001, "Not seated");
+        return new Response(null, { status: 101, webSocket: client });
+      }
       const result = await this.run(connect(state, seat, now));
       if (result._tag === "Failure") {
         return httpError(409, result.failure.reason, result.failure.message);
@@ -306,9 +313,10 @@ export class Table extends DurableObject<Env> {
     await this.commit(result.success);
   }
 
-  override async webSocketClose(socket: WebSocket, code: number): Promise<void> {
+  override async webSocketClose(socket: WebSocket): Promise<void> {
     await this.dropSocket(socket);
-    socket.close(code === 1005 ? 1000 : code, "Closed");
+    // The client's code may be reserved (1005, 1006), so always answer with a normal closure.
+    if (socket.readyState !== WebSocket.CLOSED) socket.close(1000, "Closed");
   }
 
   override async webSocketError(socket: WebSocket): Promise<void> {

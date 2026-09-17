@@ -62,14 +62,12 @@ describe("Table Worker", () => {
     const { token } = (await joined.json()) as { token: string };
     expect((await post(paths.seats(tableId), { nickname: "Bo", seat: 0 })).status).toBe(409);
 
-    const refused = new WebSocket(
-      `ws://localhost:${PORT}${paths.socket(tableId)}?token=${"0".repeat(32)}`,
+    const refused = open(tableId, "0".repeat(32));
+    const closed = new Promise((resolve) =>
+      refused.socket.addEventListener("close", (event) => resolve(event.code)),
     );
-    const outcome = await new Promise((resolve) => {
-      refused.addEventListener("open", () => resolve("open"));
-      refused.addEventListener("error", () => resolve("error"));
-    });
-    expect(outcome).toBe("error");
+    await refused.until((message) => message._tag === "Rejected" && message.reason === "NotSeated");
+    expect(await closed).toBe(4001);
 
     const client = open(tableId, token);
     await client.opened;
