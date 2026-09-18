@@ -75,13 +75,17 @@ export class Table extends DurableObject<Env> {
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    ctx.storage.sql.exec(
+    this.createSchema();
+    ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair(PING, PONG));
+  }
+
+  private createSchema() {
+    this.ctx.storage.sql.exec(
       "CREATE TABLE IF NOT EXISTS meta (id INTEGER PRIMARY KEY CHECK (id = 1), record TEXT NOT NULL)",
     );
-    ctx.storage.sql.exec(
+    this.ctx.storage.sql.exec(
       "CREATE TABLE IF NOT EXISTS events (seq INTEGER PRIMARY KEY, match INTEGER NOT NULL, at INTEGER NOT NULL, event TEXT NOT NULL)",
     );
-    ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair(PING, PONG));
   }
 
   private load(): TableState | null {
@@ -200,25 +204,29 @@ export class Table extends DurableObject<Env> {
     if (next !== null) times.push(next);
     const sockets = this.ctx.getWebSockets();
     if (sockets.length > 0 && state.record.status === "playing") {
-      times.push((await this.now()) + LIVENESS_TIMEOUT_MILLIS);
+      times.push(this.now() + LIVENESS_TIMEOUT_MILLIS);
     }
     if (times.length === 0) return this.ctx.storage.deleteAlarm();
     await this.ctx.storage.setAlarm(Math.min(...times));
   }
 
-  private now(): Promise<number> {
-    return Effect.runPromise(Clock.currentTimeMillis);
+  private now(): number {
+    return Effect.runSync(Clock.currentTimeMillis);
   }
 
-  /** Runs a core transition, turning a rejection into a value. */
+  /**
+   * Runs a core transition synchronously, turning a rejection into a value. Every handler loads
+   * the state, runs the transition and starts its commit without yielding, so no other event can
+   * interleave and act on stale state.
+   */
   private run<A>(effect: Effect.Effect<A, TableRejection>) {
-    return Effect.runPromise(Effect.result(effect));
+    return Effect.runSync(Effect.result(effect));
   }
 
   override async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const [, , , id, action] = url.pathname.split("/");
-    const now = await this.now();
+    const now = this.now();
 
     if (request.method === "POST" && action === "init") {
       if (this.load() !== null) return httpError(409, "Exists", "Table already exists");
@@ -242,8 +250,11 @@ export class Table extends DurableObject<Env> {
     if (request.method === "POST" && action === "seats") {
       const body = await readBody(request, JoinRequest);
       if (body._tag === "Failure") return httpError(400, "InvalidRequest", body.failure);
+      // Reading the body yields; other events may have committed meanwhile.
+      const current = this.load();
+      if (current === null) return httpError(404, "NotFound", "No such Table");
       const token = randomToken();
-      const result = await this.run(join(state, body.success, token, now));
+      const result = this.run(join(current, body.success, token, this.now()));
       if (result._tag === "Failure") {
         return httpError(
           rejectionStatus(result.failure),
@@ -268,7 +279,7 @@ export class Table extends DurableObject<Env> {
         server.close(4001, "Not seated");
         return new Response(null, { status: 101, webSocket: client });
       }
-      const result = await this.run(connect(state, seat, now));
+      const result = this.run(connect(state, seat, now));
       if (result._tag === "Failure") {
         return httpError(409, result.failure.reason, result.failure.message);
       }
@@ -277,7 +288,8 @@ export class Table extends DurableObject<Env> {
       const [client, server] = Object.values(new WebSocketPair()) as [WebSocket, WebSocket];
       this.ctx.acceptWebSocket(server);
       server.serializeAttachment({ seat, connectedAt: now } satisfies Attachment);
-      this.send(server, snapshotFor(result.success.state, seat));
+      // The commit awaited; start from the latest state so nothing committed meanwhile is missed.
+      this.send(server, snapshotFor(this.load() ?? result.success.state, seat));
       return new Response(null, { status: 101, webSocket: client });
     }
 
@@ -290,7 +302,7 @@ export class Table extends DurableObject<Env> {
     if (attachment === null || state === null) return;
     const seatHolder = state.record.seats[attachment.seat];
     const text = typeof message === "string" ? message : new TextDecoder().decode(message);
-    const decoded = await Effect.runPromise(Effect.result(decodeClientMessage(text)));
+    const decoded = Effect.runSync(Effect.result(decodeClientMessage(text)));
     if (decoded._tag === "Failure") {
       return this.send(socket, {
         _tag: "Rejected",
@@ -306,9 +318,7 @@ export class Table extends DurableObject<Env> {
       });
       return socket.close(4001, "Seat released");
     }
-    const result = await this.run(
-      receive(state, attachment.seat, decoded.success, await this.now()),
-    );
+    const result = this.run(receive(state, attachment.seat, decoded.success, this.now()));
     if (result._tag === "Failure") return this.send(socket, rejectionMessage(result.failure));
     await this.commit(result.success);
   }
@@ -337,14 +347,14 @@ export class Table extends DurableObject<Env> {
           (other.deserializeAttachment() as Attachment | null)?.seat === attachment.seat,
       );
     if (stillOpen) return;
-    const result = await this.run(disconnect(state, attachment.seat, await this.now()));
+    const result = this.run(disconnect(state, attachment.seat, this.now()));
     if (result._tag === "Success") await this.commit(result.success);
   }
 
   override async alarm(): Promise<void> {
     const state = this.load();
     if (state === null) return;
-    const now = await this.now();
+    const now = this.now();
 
     // Liveness: a socket that stopped pinging is gone.
     for (const socket of this.ctx.getWebSockets()) {
@@ -368,10 +378,12 @@ export class Table extends DurableObject<Env> {
       for (const socket of this.ctx.getWebSockets()) socket.close(1001, "Table expired");
       this.cached = null;
       await this.ctx.storage.deleteAll();
+      // This instance may keep serving requests for the expired id; they must find an empty Table.
+      this.createSchema();
       return;
     }
 
-    const result = await this.run(runDue(current, now));
+    const result = this.run(runDue(current, now));
     if (result._tag === "Success") await this.commit(result.success);
     else await this.schedule();
   }

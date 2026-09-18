@@ -186,6 +186,19 @@ describe("play", () => {
 });
 
 describe("Seats", () => {
+  it.effect("keeps the first disconnection time when a Seat is dropped twice", () =>
+    Effect.gen(function* () {
+      const { state } = yield* botTable;
+      const first = yield* disconnect(state, 0, 1_000);
+      const second = yield* disconnect(first.state, 0, 9_000);
+      expect(second.state.record.seats[0]).toMatchObject({
+        connected: false,
+        disconnectedAt: 1_000,
+      });
+      expect(second.tableChanged).toBe(false);
+    }),
+  );
+
   it.effect("lets a Player release a disconnected Seat and passes on the creator role", () =>
     Effect.gen(function* () {
       let state = yield* joined(newTable("abcdefghij", defaultTableSettings, 0), "Anna", 0);

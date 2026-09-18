@@ -283,6 +283,9 @@ export const connect = (state: TableState, seat: Seat, now: number) =>
 export const disconnect = (state: TableState, seat: Seat, now: number) =>
   Effect.gen(function* () {
     const out = new Builder(state);
+    const held = state.record.seats[seat];
+    // A Seat already away keeps its first disconnection time, so the takeover grace never restarts.
+    if (held?._tag !== "Player" || !held.connected) return yield* settle(out, now);
     out.setRecord({
       ...updatePlayer(state.record, seat, (player) => ({
         ...player,
