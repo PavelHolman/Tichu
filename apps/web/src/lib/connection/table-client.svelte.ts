@@ -17,8 +17,8 @@ class ConnectionLost extends Data.TaggedError("ConnectionLost")<{
   readonly code: number;
 }> {}
 
-/** Close codes after which reconnecting is pointless. */
-const FINAL_CLOSE_CODES = new Set([1000, 4001]);
+/** Close codes after which reconnecting is pointless: closed, expired, or no longer seated. */
+const FINAL_CLOSE_CODES = new Set([1000, 1001, 4001]);
 
 /**
  * The live link to a Table: one WebSocket that reconnects with backoff, pings to stay alive, and

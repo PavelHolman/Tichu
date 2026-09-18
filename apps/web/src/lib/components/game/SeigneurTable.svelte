@@ -71,6 +71,8 @@
     return "";
   });
 
+  let confirmingClose = $state(false);
+
   let hierarchy = $state<ReadonlyArray<number> | null>(null);
   $effect(() =>
     client.onEvent((event) => {
@@ -86,8 +88,7 @@
     <span>Round {round?.number ?? "-"}</span>
     <span class="font-semibold text-[var(--gold)]">{titleOf(me) ?? "Grand Seigneur"}</span>
     {#if isCreator}
-      <Button size="xs" variant="ghost" onclick={() => client.send({ _tag: "Close" })}
-        >Close Table</Button
+      <Button size="xs" variant="ghost" onclick={() => (confirmingClose = true)}>Close Table</Button
       >
     {:else}
       <span class="text-neutral-400">{seats} Seats</span>
@@ -209,5 +210,31 @@
       {/each}
     </ol>
     <Button onclick={() => (hierarchy = null)}>Next Round</Button>
+  </Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={confirmingClose}>
+  <Dialog.Content>
+    <Dialog.Header>
+      <Dialog.Title>Close the Table for everyone?</Dialog.Title>
+      <Dialog.Description>
+        The Match ends here for every Player and cannot be resumed. The hierarchy stands as it is.
+      </Dialog.Description>
+    </Dialog.Header>
+    <div class="flex gap-2">
+      <Button class="flex-1" variant="outline" onclick={() => (confirmingClose = false)}>
+        Keep playing
+      </Button>
+      <Button
+        class="flex-1"
+        variant="destructive"
+        onclick={() => {
+          confirmingClose = false;
+          client.send({ _tag: "Close" });
+        }}
+      >
+        Close Table
+      </Button>
+    </div>
   </Dialog.Content>
 </Dialog.Root>

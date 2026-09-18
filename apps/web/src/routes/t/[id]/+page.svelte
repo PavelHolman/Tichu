@@ -56,7 +56,12 @@
   );
 </script>
 
-{#if client !== null && client.table !== null && client.you !== null}
+{#if client !== null && client.status === "closed" && client.table?.status !== "closed"}
+  <main class="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center gap-3 px-4">
+    <p>This Table is no longer available.</p>
+    <a class="underline" href="/">Start a new one</a>
+  </main>
+{:else if client !== null && client.table !== null && client.you !== null}
   {#if client.table.status === "lobby"}
     <main class="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-4 py-6">
       <h1 class="text-2xl font-bold">Table</h1>
