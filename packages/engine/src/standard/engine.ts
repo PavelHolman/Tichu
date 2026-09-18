@@ -159,7 +159,10 @@ export const evolve = (state: StandardState, event: StandardEvent): StandardStat
         ...state,
         totals: event.totals,
         lastRound: event,
-        round: round === null ? null : { ...round, phase: "ended" },
+        round:
+          round === null
+            ? null
+            : withKernel({ ...round, phase: "ended" }, { ...round.kernel, turn: null }),
       };
     case "MatchEnded":
       return { ...state, winningTeam: event.winningTeam };

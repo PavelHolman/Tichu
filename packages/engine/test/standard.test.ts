@@ -423,6 +423,8 @@ describe("Round end and scoring", () => {
       const winning = inPlay({ hands: ["Aj", "3s 2s", "Dr", "4t 2t"], turn: 0, totals: [900, 0] });
       const won = yield* actAll(winning, [play(0, "Aj"), pass(1), play(2, "Dr")]);
       expect(tags(won.events).at(-1)).toBe("MatchEnded");
+      // The final Round stays on screen, but nobody is on turn any more.
+      expect(observe(won.state, 1).round).toMatchObject({ phase: "ended", turn: null });
       expect(yield* rejected(won.state, pass(1))).toBe("MatchOver");
     }),
   );
