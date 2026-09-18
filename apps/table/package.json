@@ -7,7 +7,8 @@
     "gen": "wrangler types",
     "typecheck": "wrangler types >/dev/null && tsc -p .",
     "deploy": "wrangler deploy",
-    "test:integration": "vitest run --config integration/vitest.config.ts"
+    "test:integration": "vitest run --config integration/vitest.config.ts",
+    "friend": "bun journeys/friend.ts"
   },
   "dependencies": {
     "@tichu/bots": "workspace:*",

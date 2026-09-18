@@ -186,6 +186,32 @@ describe("play", () => {
 });
 
 describe("Seats", () => {
+  it.effect("lets a Player free an away Seat mid-Match so a newcomer can take it", () =>
+    Effect.gen(function* () {
+      let state = yield* joined(newTable("abcdefghij", defaultTableSettings, 0), "Anna", 0);
+      state = yield* joined(state, "Bo", 2, 1);
+      state = (yield* connect(state, 0, 2)).state;
+      state = (yield* connect(state, 2, 2)).state;
+      for (const seat of [1, 3]) {
+        state = (yield* send(state, 0, { _tag: "FillSeat", seat, tier: "heuristic" })).state;
+      }
+      state = (yield* send(state, 0, { _tag: "Start" })).state;
+      state = (yield* disconnect(state, 2, 10)).state;
+
+      const freed = yield* send(state, 0, { _tag: "ReleaseSeat", seat: 2 }, 20);
+      expect(freed.state.record.seats[2]).toBeNull();
+      expect(freed.state.record.status).toBe("playing");
+      const back = yield* join(freed.state, { nickname: "Bo", seat: 2 }, token(2), 30);
+      expect(back.transition.state.record.seats[2]).toMatchObject({
+        _tag: "Player",
+        nickname: "Bo",
+      });
+
+      const handed = yield* send(state, 0, { _tag: "HandToBot", seat: 2 }, 20);
+      expect(handed.state.record.seats[2]).toEqual({ _tag: "Bot", tier: "heuristic" });
+    }),
+  );
+
   it.effect("keeps the first disconnection time when a Seat is dropped twice", () =>
     Effect.gen(function* () {
       const { state } = yield* botTable;
