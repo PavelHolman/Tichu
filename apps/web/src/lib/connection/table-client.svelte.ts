@@ -1,5 +1,7 @@
 import type { GameEvent, Observation } from "@tichu/engine";
 import {
+  CLOSE_EXPIRED,
+  CLOSE_NOT_SEATED,
   PING,
   PING_INTERVAL_MILLIS,
   PONG,
@@ -17,8 +19,11 @@ class ConnectionLost extends Data.TaggedError("ConnectionLost")<{
   readonly code: number;
 }> {}
 
-/** Close codes after which reconnecting is pointless: closed, expired, or no longer seated. */
-const FINAL_CLOSE_CODES = new Set([1000, 1001, 4001]);
+/**
+ * Close codes after which reconnecting is pointless: the Table closed or expired, or the Seat is
+ * no longer held. Anything else, including 1001 on a server restart, is retried.
+ */
+const FINAL_CLOSE_CODES = new Set([1000, CLOSE_EXPIRED, CLOSE_NOT_SEATED]);
 
 /**
  * The live link to a Table: one WebSocket that reconnects with backoff, pings to stay alive, and
@@ -65,7 +70,7 @@ export class TableClient {
       Effect.tapError((lost) =>
         Effect.sync(() => {
           this.socket = null;
-          if (lost.code === 4001) this.status = "refused";
+          if (lost.code === CLOSE_NOT_SEATED) this.status = "refused";
           else if (FINAL_CLOSE_CODES.has(lost.code)) this.status = "closed";
           else this.status = "reconnecting";
         }),

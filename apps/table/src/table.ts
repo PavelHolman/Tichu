@@ -1,5 +1,7 @@
 import type { GameEvent } from "@tichu/engine";
 import {
+  CLOSE_EXPIRED,
+  CLOSE_NOT_SEATED,
   CreateTableRequest,
   JoinRequest,
   PING,
@@ -276,7 +278,7 @@ export class Table extends DurableObject<Env> {
         const [client, server] = Object.values(new WebSocketPair()) as [WebSocket, WebSocket];
         server.accept();
         this.send(server, { _tag: "Rejected", reason: "NotSeated", message: "Unknown Seat token" });
-        server.close(4001, "Not seated");
+        server.close(CLOSE_NOT_SEATED, "Not seated");
         return new Response(null, { status: 101, webSocket: client });
       }
       const result = this.run(connect(state, seat, now));
@@ -316,7 +318,7 @@ export class Table extends DurableObject<Env> {
         reason: "NotSeated",
         message: "This Seat was released",
       });
-      return socket.close(4001, "Seat released");
+      return socket.close(CLOSE_NOT_SEATED, "Seat released");
     }
     const result = this.run(receive(state, attachment.seat, decoded.success, this.now()));
     if (result._tag === "Failure") return this.send(socket, rejectionMessage(result.failure));
@@ -375,7 +377,7 @@ export class Table extends DurableObject<Env> {
         const finished = match < current.record.match || current.record.status === "finished";
         await this.exportMatch(match, !finished);
       }
-      for (const socket of this.ctx.getWebSockets()) socket.close(1001, "Table expired");
+      for (const socket of this.ctx.getWebSockets()) socket.close(CLOSE_EXPIRED, "Table expired");
       this.cached = null;
       await this.ctx.storage.deleteAll();
       // This instance may keep serving requests for the expired id; they must find an empty Table.

@@ -116,6 +116,10 @@ export const ServerMessage = Schema.Union([
 ]);
 export type ServerMessage = typeof ServerMessage.Type;
 
+/** Close codes the Table uses: the Seat is not (or no longer) held, or the Table expired. */
+export const CLOSE_NOT_SEATED = 4001;
+export const CLOSE_EXPIRED = 4002;
+
 export const PING = "ping";
 export const PONG = "pong";
 export const PING_INTERVAL_MILLIS = 20_000;
