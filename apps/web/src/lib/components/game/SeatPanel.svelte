@@ -14,6 +14,8 @@
     status,
     now,
     compact = false,
+    onFree,
+    onHandToBot,
   }: {
     name: string;
     occupant: Occupant | null;
@@ -28,6 +30,9 @@
     now: number;
     /** Drops the card backs for crowded Tables. */
     compact?: boolean;
+    /** Offered while the Player is away: free the Seat for someone else, or let a Bot keep it. */
+    onFree?: () => void;
+    onHandToBot?: () => void;
   } = $props();
 
   const TONES = {
@@ -68,5 +73,27 @@
           ? " · Bot playing"
           : ""}
     </div>
+    {#if onFree || onHandToBot}
+      <div class="flex gap-1">
+        {#if onFree}
+          <button
+            type="button"
+            class="rounded bg-white/10 px-1.5 py-0.5 text-[10px] hover:bg-white/20"
+            onclick={onFree}
+          >
+            Free Seat
+          </button>
+        {/if}
+        {#if onHandToBot}
+          <button
+            type="button"
+            class="rounded bg-white/10 px-1.5 py-0.5 text-[10px] hover:bg-white/20"
+            onclick={onHandToBot}
+          >
+            Bot plays
+          </button>
+        {/if}
+      </div>
+    {/if}
   {/if}
 </div>

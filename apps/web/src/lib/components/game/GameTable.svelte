@@ -79,9 +79,17 @@
   });
 
   let summary = $state<RoundEnded | null>(null);
+  let resultsDismissed = $state(false);
+  const matchOver = $derived(observation.winningTeam !== null);
+  const dialogOpen = $derived(matchOver ? !resultsDismissed : summary !== null);
   $effect(() =>
     client.onEvent((event) => {
       if (event._tag === "RoundEnded") summary = event;
+      // A rematch starts fresh: last Match's Round and result must not reappear.
+      if (event._tag === "MatchStarted") {
+        summary = null;
+        resultsDismissed = false;
+      }
     }),
   );
 </script>
@@ -100,7 +108,11 @@
         {#if team < observation.totals.length - 1}<span class="text-neutral-500"> · </span>{/if}
       {/each}
     </span>
-    <span class="text-neutral-400">to {observation.settings.targetScore}</span>
+    {#if matchOver && resultsDismissed}
+      <Button size="xs" variant="ghost" onclick={() => (resultsDismissed = false)}>Results</Button>
+    {:else}
+      <span class="text-neutral-400">to {observation.settings.targetScore}</span>
+    {/if}
   </header>
 
   {#if round !== null}
@@ -131,6 +143,8 @@
               ? `out ${["1st", "2nd", "3rd"][round.finished.indexOf(seat)]}`
               : cardCount(round.handCounts[seat] ?? 0)}
             {now}
+            onFree={() => client.send({ _tag: "ReleaseSeat", seat })}
+            onHandToBot={() => client.send({ _tag: "HandToBot", seat })}
           />
         </div>
       {/each}
@@ -258,14 +272,67 @@
   {/if}
 </div>
 
+{#snippet roundTable(round: RoundEnded)}
+  <p class="text-sm text-neutral-400">
+    Round {round.round}: {round.finishingOrder.map(name).join(", ")}{round.oneTwo
+      ? " (one-two!)"
+      : ""}
+  </p>
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="text-neutral-400">
+        <th class="text-left font-normal"></th>
+        {#each round.points as _, team (team)}
+          <th class="text-right font-normal">{teamLabel(team)}</th>
+        {/each}
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Cards</td>
+        {#each round.cardPoints as points, team (team)}
+          <td class="text-right">{points}</td>
+        {/each}
+      </tr>
+      {#each round.calls as call (call.seat)}
+        <tr>
+          <td>
+            {name(call.seat)}: {call.call === "grandTichu" ? "Grand Tichu" : "Tichu"}
+            {call.succeeded ? "made" : "failed"}
+          </td>
+          {#each round.points as _, team (team)}
+            <td class="text-right">
+              {observation.layout.teams[team]?.includes(call.seat) ? call.points : ""}
+            </td>
+          {/each}
+        </tr>
+      {/each}
+      <tr class="font-semibold">
+        <td>Round</td>
+        {#each round.points as points, team (team)}
+          <td class="text-right">{points}</td>
+        {/each}
+      </tr>
+      <tr class="text-[var(--gold)]">
+        <td>Total</td>
+        {#each round.totals as total, team (team)}
+          <td class="text-right">{total}</td>
+        {/each}
+      </tr>
+    </tbody>
+  </table>
+{/snippet}
+
 <Dialog.Root
-  open={summary !== null || observation.winningTeam !== null}
+  open={dialogOpen}
   onOpenChange={(open) => {
-    if (!open) summary = null;
+    if (open) return;
+    if (matchOver) resultsDismissed = true;
+    else summary = null;
   }}
 >
   <Dialog.Content>
-    {#if observation.winningTeam !== null}
+    {#if matchOver}
       <Dialog.Header>
         <Dialog.Title>
           {observation.winningTeam === myTeam ? "You won the Match!" : "The Match is over"}
@@ -274,6 +341,9 @@
           {observation.totals.map((total, team) => `${teamLabel(team)} ${total}`).join(" · ")}
         </Dialog.Description>
       </Dialog.Header>
+      {#if observation.lastRound !== null}
+        {@render roundTable(observation.lastRound)}
+      {/if}
       {#if isCreator}
         <Button onclick={() => client.send({ _tag: "Rematch" })}>Play again</Button>
       {:else}
@@ -282,55 +352,8 @@
     {:else if summary !== null}
       <Dialog.Header>
         <Dialog.Title>Round {summary.round}</Dialog.Title>
-        <Dialog.Description>
-          Finishing order: {summary.finishingOrder.map(name).join(", ")}{summary.oneTwo
-            ? " (one-two!)"
-            : ""}
-        </Dialog.Description>
       </Dialog.Header>
-      <table class="w-full text-sm">
-        <thead>
-          <tr class="text-neutral-400">
-            <th class="text-left font-normal"></th>
-            {#each summary.points as _, team (team)}
-              <th class="text-right font-normal">{teamLabel(team)}</th>
-            {/each}
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Cards</td>
-            {#each summary.cardPoints as points, team (team)}
-              <td class="text-right">{points}</td>
-            {/each}
-          </tr>
-          {#each summary.calls as call (call.seat)}
-            <tr>
-              <td>
-                {name(call.seat)}: {call.call === "grandTichu" ? "Grand Tichu" : "Tichu"}
-                {call.succeeded ? "made" : "failed"}
-              </td>
-              {#each summary.points as _, team (team)}
-                <td class="text-right">
-                  {observation.layout.teams[team]?.includes(call.seat) ? call.points : ""}
-                </td>
-              {/each}
-            </tr>
-          {/each}
-          <tr class="font-semibold">
-            <td>Round</td>
-            {#each summary.points as points, team (team)}
-              <td class="text-right">{points}</td>
-            {/each}
-          </tr>
-          <tr class="text-[var(--gold)]">
-            <td>Total</td>
-            {#each summary.totals as total, team (team)}
-              <td class="text-right">{total}</td>
-            {/each}
-          </tr>
-        </tbody>
-      </table>
+      {@render roundTable(summary)}
       <Button onclick={() => (summary = null)}>Next Round</Button>
     {/if}
   </Dialog.Content>

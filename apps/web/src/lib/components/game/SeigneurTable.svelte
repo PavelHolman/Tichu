@@ -123,6 +123,8 @@
               : cardCount(round.handCounts[seat] ?? 0)}
             compact={seats > 6}
             {now}
+            onFree={() => client.send({ _tag: "ReleaseSeat", seat })}
+            onHandToBot={() => client.send({ _tag: "HandToBot", seat })}
           />
         </div>
       {/each}
