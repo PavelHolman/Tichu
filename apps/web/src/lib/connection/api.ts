@@ -9,8 +9,12 @@ import {
 } from "@tichu/protocol";
 import { Effect, Schema } from "effect";
 
-/** The Table Worker's origin. Local `wrangler dev` of apps/table by default. */
-export const tableOrigin = (): string => env.PUBLIC_TABLE_URL ?? "http://localhost:8787";
+/**
+ * The Table Worker's origin. Without `PUBLIC_TABLE_URL`, the local `wrangler dev` on port 8787 of
+ * the host this page came from, so a phone on the same network reaches it too.
+ */
+export const tableOrigin = (): string =>
+  env.PUBLIC_TABLE_URL ?? `${location.protocol}//${location.hostname}:8787`;
 
 export class ApiError extends Schema.TaggedError<ApiError>()("ApiError", {
   status: Schema.Number,
