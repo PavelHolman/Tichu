@@ -1,0 +1,24 @@
+{
+  "name": "@tichu/table",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --port 8787",
+    "gen": "wrangler types",
+    "typecheck": "wrangler types >/dev/null && tsc -p .",
+    "deploy": "wrangler deploy",
+    "test:integration": "vitest run --config integration/vitest.config.ts",
+    "friend": "bun journeys/friend.ts"
+  },
+  "dependencies": {
+    "@tichu/bots": "workspace:*",
+    "@tichu/engine": "workspace:*",
+    "@tichu/protocol": "workspace:*",
+    "effect": "4.0.0-rc.115",
+    "temporal-polyfill": "1.0.5"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.0.0-rc.115",
+    "wrangler": "4.133.0"
+  }
+}
