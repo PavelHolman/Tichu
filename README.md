@@ -9,8 +9,6 @@ and bots fill any empty Seats so a game can always start.
   <img src="docs/screenshots/trick.png" alt="A trick in progress: a bot has played a full house, another bot called Grand Tichu" width="300">
 </p>
 
-**Status:** in development; not deployed yet. Run it locally with two commands (see [Run locally](#run-locally)).
-
 ## Features
 
 - **Play by link:** create a Table, send the link, friends join from any device (installable PWA).
