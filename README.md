@@ -3,6 +3,12 @@
 A web app for playing the card game **Tichu** with friends in the browser. Share a link to a Table, take a Seat,
 and bots fill any empty Seats so a game can always start.
 
+<p align="center">
+  <img src="docs/screenshots/table.png" alt="A Table with one player and three bots, ready to start" width="300">
+  &nbsp;
+  <img src="docs/screenshots/trick.png" alt="A trick in progress: a bot has played a full house, another bot called Grand Tichu" width="300">
+</p>
+
 **Status:** in development; not deployed yet. Run it locally with two commands (see [Run locally](#run-locally)).
 
 ## Features
